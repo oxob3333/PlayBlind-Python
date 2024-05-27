@@ -1,3 +1,4 @@
+import math
 import random
 
 card_enhancement_array = ["Wild", "Bonus", "Multi", "Glass", "Steel", "Stone", "Gold", "Lucky"]
@@ -121,13 +122,18 @@ def detect_hand(card_selection):
         is_straight = False
     else:
         # Check if each number is one larger than previous
-        for k in range(len(card_selection) - 1):
-            if int_array[k] != int_array[k + 1] - 1:
-                is_straight = False
+        # If a card has a stone enhancement, set is_straight to False
         
-        # Check for edge case 10 J Q K A
-        if int_array[0] == 1 and int_array[1] == 10 and int_array[2] == 11 and int_array[3] == 12 and int_array[4] == 13:
-            is_straight = True
+        if "Stone" in [card[2] for card in card_selection]:
+            is_straight = False
+        else:
+            for k in range(len(card_selection) - 1):
+                if int_array[k] != int_array[k + 1] - 1:
+                    is_straight = False
+            
+            # Check for edge case 10 J Q K A
+            if int_array[0] == 1 and int_array[1] == 10 and int_array[2] == 11 and int_array[3] == 12 and int_array[4] == 13:
+                is_straight = True
     
     # Check if there are duplicates of ranks
     current_streak = 1
@@ -194,6 +200,8 @@ def score_hand_chips(hand_type, played_hand):
             played_hand_int.append(10)
         elif rank == "K":
             played_hand_int.append(10)
+        elif rank == "NONE":
+            played_hand_int.append(0)
         else:
             played_hand_int.append(int(rank))
 
@@ -201,63 +209,88 @@ def score_hand_chips(hand_type, played_hand):
     if hand_type == "Straight Flush":
         chips += 100
         chips += sum(played_hand_int)
+        scoring_hand = played_hand
     elif hand_type == "Four of a Kind":
         chips += 60
         if ranks_sorted[0] == ranks_sorted[1]:
             chips += sum(played_hand_int[:4])
+            # Define scoring hand to be the 4 cards that are part of the four of a kind and drop the last card
+            scoring_hand = [played_hand[0], played_hand[1], played_hand[2], played_hand[3]]
         else:
             chips += sum(played_hand_int[1:5])
+            scoring_hand = [played_hand[1], played_hand[2], played_hand[3], played_hand[4]]
     elif hand_type == "Full House":
         chips += 40
         chips += sum(played_hand_int)
+        scoring_hand = played_hand
     elif hand_type == "Flush":
         chips += 35
         chips += sum(played_hand_int)
+        scoring_hand = played_hand
     elif hand_type == "Straight":
         chips += 30
         chips += sum(played_hand_int)
+        scoring_hand = played_hand
     elif hand_type == "Three of a Kind":
         chips += 30
         if ranks_sorted[0] == ranks_sorted[1]:
             chips += sum(played_hand_int[:3])
+            # Define scoring hand to be the 3 cards that are part of the three of a kind and drop the last 2 cards
+            scoring_hand = [played_hand[0], played_hand[1], played_hand[2]]
         elif ranks_sorted[1] == ranks_sorted[2]:
             chips += sum(played_hand_int[1:4])
+            scoring_hand = [played_hand[1], played_hand[2], played_hand[3]]
         else:
             chips += sum(played_hand_int[2:5])
+            scoring_hand = [played_hand[2], played_hand[3], played_hand[4]]
     elif hand_type == "Two Pair":
         chips += 20
         if ranks_sorted[0] == ranks_sorted[1] and ranks_sorted[2] == ranks_sorted[3]:
+            # Define scoring hand to be the 4 cards that are part of the two pairs and drop the last card
             chips += sum(played_hand_int[:4])
+            scoring_hand = [played_hand[0], played_hand[1], played_hand[2], played_hand[3]]
         elif ranks_sorted[1] == ranks_sorted[2]:
             chips += sum(played_hand_int[1:5])
+            scoring_hand = [played_hand[1], played_hand[2], played_hand[3], played_hand[4]]
         else:
             chips += played_hand_int[0] + played_hand_int[1] + played_hand_int[3] + played_hand_int[4]
+            scoring_hand = [played_hand[0], played_hand[1], played_hand[3], played_hand[4]]
     elif hand_type == "Pair":
         chips += 10
+        # if pair hand has more than 2 cards, then remove the cards that are not part of the pair
         if ranks_sorted[0] == ranks_sorted[1]:
             chips += played_hand_int[0] + played_hand_int[1]
+            scoring_hand = [played_hand[0], played_hand[1]]
         elif ranks_sorted[1] == ranks_sorted[2]:
             chips += played_hand_int[1] + played_hand_int[2]
+            scoring_hand = [played_hand[1], played_hand[2]]
         elif ranks_sorted[2] == ranks_sorted[3]:
             chips += played_hand_int[2] + played_hand_int[3]
+            scoring_hand = [played_hand[2], played_hand[3]]
         else:
             chips += played_hand_int[3] + played_hand_int[4]
+            scoring_hand = [played_hand[3], played_hand[4]]
+            
     # If there is a stone card enhancement present in played hand, +50 chips to the total chips for every stone card present
-    
     elif "Stone" in [card[2] for card in played_hand]:
         chips += 50 * [card[2] for card in played_hand].count("Stone")
     else:
         chips += 5
         chips += max(played_hand_int)
+        scoring_hand = [played_hand[played_hand_int.index(max(played_hand_int))]]
         
-    # If there is a Foil edition present in played hand, +30 chips to the total chips
-    if "Foil" in [card[3] for card in played_hand]:
+    # If there is a bonus card enhnanement present in scoring hand, +10 chips to the total chips for every bonus card played
+    if "Bonus" in [card[2] for card in scoring_hand]:
+        chips += 30 * [card[2] for card in scoring_hand].count("Bonus")
+        
+        
+    # If there is a Foil edition present in scoring hand, +30 chips to the total chips
+    if "Foil" in [card[3] for card in scoring_hand]:
         chips += 50
     
+    return chips, scoring_hand
 
-    return chips
-
-def score_hand_multi(hand_type, played_hand):
+def score_hand_multi(hand_type, played_hand, scoring_hand):
     Multi = 0
     
     if hand_type == "Straight Flush":
@@ -279,12 +312,12 @@ def score_hand_multi(hand_type, played_hand):
     else:
         Multi = 1
         
-    # If there is a Holographic edition present in played hand, +10 mult to the total mult for every Holographic card present
-    if "Holographic" in [card[3] for card in played_hand]:
-        Multi += 10 * [card[3] for card in played_hand].count("Holographic")
-    # if there is a Polychrome edition present in played hand, x1.5 mult to the total mult for every Polychrome card present
-    elif "Polychrome" in [card[3] for card in played_hand]:
-        Multi *= 1.5 * [card[3] for card in played_hand].count("Polychrome")
+    # If there is a Holographic edition present in scoring hand, +10 mult to the total mult for every Holographic card played in the scoring hand
+    if "Holographic" in [card[3] for card in scoring_hand]:
+        Multi += 10 * [card[3] for card in scoring_hand].count("Holographic")
+    # If there is a Polychrome edition present in scoring hand, *1.5 to the total mult for every Polychrome card played in the scoring hand
+    elif "Polychrome" in [card[3] for card in scoring_hand]:
+        Multi *= 1.5 * [card[3] for card in scoring_hand].count("Polychrome")
     
     return Multi
 
@@ -311,22 +344,6 @@ def toString2DArray(array):
     
     str2DArray += "}"
     return str2DArray
-
-def hand_input_valid(card_selection):
-    is_valid = True
-
-    if len(card_selection) == 0 or len(card_selection) > 5 or card_selection[0] == "":
-        is_valid = False
-
-    for i in range(len(card_selection)):
-        for j in range(i + 1, len(card_selection)):
-            if card_selection[i] == card_selection[j]:
-                is_valid = False
-
-        if card_selection[i] not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
-            is_valid = False
-
-    return is_valid
 
 def set_boss_blind_for_current_level():
     # Set the boss blind for the current level by randomly selecting a boss blind from the boss_blinds_array but not repeating until all have been used
@@ -362,9 +379,13 @@ def change_blind_chips_depending_on_current_ante(blind_chips,current_ante, curre
 
     
 main_deck = shuffle_array(deckArray())
-main_hand = [[''] * 2 for _ in range(8)]
+main_hand = [[''] * 5 for _ in range(8)]
 top_deck = 0
 
+# Change all cards in the main deck to have a random edition of 1 in a 4 chance
+for i in range(len(main_deck)):
+    if random.randint(1, 4) == 1:
+        main_deck[i][3] = random.choice(card_editions_array)
 # Game variables to keep track of game state and player progress on the first round
 
 hands_remaining = 4
@@ -416,7 +437,7 @@ while ante_level <= 2:
                 print("The Beast has activated! You have 1 discard remaining!")
             # The machine effect reduces your scored chips by exactly 50 points every hand played
             elif boss_blind == "The Machine":
-                print("The Machine has activated! Your chips will be reduced by 25 each hand you play!")
+                print("The Machine has activated! Your chips will be reduced by 50 each hand you play!")
             # The spirit effect sets your scored mult by exactly 5 points every hand played
             elif boss_blind == "The Spirit":
                 print("The Spirit has activated! Your mult will be reduced by 5 each hand you play!")
@@ -476,37 +497,38 @@ while ante_level <= 2:
             print("\nType \"Play\" to play hand, type \"Discard\" to discard hand.")
             play_or_discard = input()
             if play_or_discard == "Play":
+
                 # Score the hand and add to total chips
+                current_chips, scoring_hand = score_hand_chips(detect_hand(hand_selected), hand_selected)
+                current_mult = score_hand_multi(detect_hand(hand_selected), hand_selected, scoring_hand)
                 
-                current_chips = score_hand_chips(detect_hand(hand_selected), hand_selected)
-                current_mult = score_hand_multi(detect_hand(hand_selected), hand_selected)
                 
+                
+                print("\n{~~~~~~~~~~~~~~~~~~~~~~~}")
+                print("Played " + detect_hand(hand_selected) + "!")
                 if boss_blind == "The Machine" and current_blind == "Boss blind":
-                    print("\n{~~~~~~~~~~~~~~~~~~~~~~~}")
                     print("Affected by The Machine!")
                     print("Reduced by 50 chips!")
-                    print("{~~~~~~~~~~~~~~~~~~~~~~~}\n")
                     if current_chips >= 50:
                         current_chips -= 50
                     else:
                         current_chips = 0
                 elif boss_blind == "The Spirit" and current_blind == "Boss blind":
-                    print("\n{~~~~~~~~~~~~~~~~~~~~~~~}")
                     print("Affected by The Spirit!")
                     print("Reduced by 5 mult!")
-                    print("{~~~~~~~~~~~~~~~~~~~~~~~}\n")
                     if current_mult >= 5:
                         current_mult -= 5
                     else:
                         current_mult = 0
-                
-                print("\n{~~~~~~~~~~~~~~~~~~~~~~~}")
-                print("Played " + detect_hand(hand_selected) + "!")
-                print("[" + str(current_chips) + "] X [" + str(current_mult) + "] = " + str(current_chips * current_mult) + " chips")
+                        
+                print("[" + str(current_chips) + "] X [" + str(current_mult) + "] = " + str(math.ceil(current_chips * current_mult)) + " chips")
                 print("{~~~~~~~~~~~~~~~~~~~~~~~}\n")
                 
                 total_chips += current_chips * current_mult
                 
+                #if total chips is decimal, round up to the nearest whole number
+                if total_chips % 1 != 0:
+                    total_chips = math.ceil(total_chips)
                 
                 
                 hands_remaining -= 1
@@ -586,14 +608,10 @@ while ante_level <= 2:
     
     # Change the blind level, if small blind, go to big blind, if big blind, go to boss blind, if boss blind, go to small blind again and increase ante level and change boss blind effect
     
-    if current_blind == "Small blind":
-        current_blind = "Big blind"
-    elif current_blind == "Big blind":
-        current_blind = "Boss blind"
-    else:
-        boss_blind = set_boss_blind_for_current_level()
-        current_blind = "Small blind"
-        ante_level += 1
+
+    boss_blind = set_boss_blind_for_current_level()
+    current_blind = "Small blind"
+    ante_level += 1
     
     blind_chips = change_blind_chips_depending_on_current_ante(blind_chips,ante_level, current_blind)
     
@@ -666,16 +684,16 @@ while ante_level <= 2:
                         print("Enhancements: ")
                         for i in range(3):
                             print(f"{i + 1}. {card_enhancement_array[i]}")
-                        # Ask player to pick a card from the booster pack to change the enhancement
+                        # Ask player to pick a card from the hand drawn to change the enhancement
                         print("{~~~~~~~~~~~~~~~~~~~~~~~}")
-                        print("\n\nPick a card from the booster pack to change the enhancement! (Enter hand position of card, ex. \"1\")")
-                        card_selection = input()
+                        print("\n\nPick a max of 5 cards from the hand drawn to change the enhancement! (Enter hand position of card, ex. \"1 2 3\")")
+                        card_selection = input().split
                         # Input failsafe
                         while True:
-                            if card_selection in ["1", "2", "3", "4", "5", "6", "7", "8"]:
+                            if hand_input_valid(card_selection):
                                 break
                             print("Hand invalid, try again!")
-                            card_selection = input()
+                            card_selection = input().split
                         # Ask the player to pick an enhancement to change the card to
                         print("\n{~~~~~~~~~~~~~~~~~~~~~~~}")
                         print("Enter the enhancement you would like to change the card to with the options shown! [Wild, Bonus, etc.]")
@@ -686,8 +704,9 @@ while ante_level <= 2:
                                 break
                             print("Enhancement invalid, try again!")
                             enhance_selection = input()
-                        # Change the enhancement of the card using the function change_enhancement_single_card_by_player
-                        booster_pack[int(card_selection) - 1][2] = enhance_selection
+                        # Change the enhancement of the cards using the function change_enhancement_single_card_by_player
+                        for card in card_selection:
+                            booster_pack[int(card) - 1][2] = enhance_selection
                         print("\n{~~~~~~~~~~~~~~~~~~~~~~~}")
                         print("Changed enhancement!")
                         print("{~~~~~~~~~~~~~~~~~~~~~~~}\n")
@@ -724,9 +743,9 @@ while ante_level <= 2:
                         print("Editions: ")
                         for i in range(3):
                             print(f"{i + 1}. {card_editions_array[i]}")
-                        # Ask player to pick a card from the booster pack to change the edition
+                        # Ask player to pick a card from the hand drawn to change the edition
                         print("{~~~~~~~~~~~~~~~~~~~~~~~}")
-                        print("\n\nPick a card from the booster pack to change the edition! (Enter hand position of card, ex. \"1\")")
+                        print("\n\nPick a card from the hand drawn to change the edition! (Enter hand position of card, ex. \"1\")")
                         card_selection = input()
                         # Input failsafe
                         while True:
@@ -781,9 +800,9 @@ while ante_level <= 2:
                         print("Seals: ")
                         for i in range(3):
                             print(f"{i + 1}. {card_seals_array[i]}")
-                        # Ask player to pick a card from the booster pack to change the seal
+                        # Ask player to pick a card from the hand drawn to change the seal
                         print("{~~~~~~~~~~~~~~~~~~~~~~~}")
-                        print("\n\nPick a card from the booster pack to change the seal! (Enter hand position of card, ex. \"1\")")
+                        print("\n\nPick a card from the hand drawn to change the seal! (Enter hand position of card, ex. \"1\")")
                         card_selection = input()
                         # Input failsafe
                         while True:
